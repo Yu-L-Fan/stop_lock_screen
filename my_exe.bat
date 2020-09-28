@@ -1,0 +1,1 @@
+python E:\stop_lockScreen\stop_lock_screen.py
