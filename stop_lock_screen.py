@@ -4,27 +4,67 @@
 @File    :   stop_lock_screen.py
 @Time    :   2020/09/19 13:37:48
 @Author  :   GuanYu 
-@Version :   1.2
+@Version :   1.5
 @Contact :   331423
-@Des     :   单文件脚本，文件包含my_exe.bat、lock.png、stop_lock_screen.py，三个文件，将my_exe.bat放入开机启动文件夹可实现开机自动执行。
+@Des     :   单文件脚本，文件包含my_exe.bat、lock.png、stop_lock_screen.py，
+             三个文件，将my_exe.bat放入开机启动文件夹可实现开机自动执行。
+             
+             + 实现右键弹出退出菜单，可正常结束脚本
+             + 更改按键为scroll_lock，避免剪贴板覆盖截屏
 '''
 
+import ctypes
+import inspect
 import os
 import threading
 import time
 from tkinter import *
+from tkinter import messagebox
 
 from pynput import keyboard, mouse
 
 
+def _async_raise(tid, exctype):
+    """ Function of killing thread """
+    tid = ctypes.c_long(tid)
+    if not inspect.isclass(exctype):
+        exctype = type(exctype)
+    res = ctypes.pythonapi.PyThreadState_SetAsyncExc(tid,
+                                                     ctypes.py_object(exctype))
+    if res == 0:
+        raise ValueError("invalid thread id")
+    elif res != 1:
+        ctypes.pythonapi.PyThreadState_SetAsyncExc(tid, None)
+        raise SystemError("PyThreadState_SetAsyncExc failed")
+
+
+def stop_thread(thread):
+    """ Function of killing thread """
+    _async_raise(thread.ident, SystemExit)
+
+
+def press_key(my_keyboard):
+    """ Function of pressing key """
+    my_keyboard.press(keyboard.Key.scroll_lock)
+    time.sleep(0.1)
+    my_keyboard.release(keyboard.Key.scroll_lock)
+    
+    my_keyboard.press(keyboard.Key.scroll_lock)
+    time.sleep(0.1)
+    my_keyboard.release(keyboard.Key.scroll_lock)
+
+
 def check_mouse_move(t):
-    global text1
+    """ Check mouse's movement,and press the key to prevent lock screen,
+        and update text. """
+    global text1, press_fre
     my_mouse = mouse.Controller()
     my_keyboard = keyboard.Controller()
     old_pos = my_mouse.position
     start_time = time.time()
+    press_time = time.time()
     while True:
-        time.sleep(1)
+        time.sleep(check_fre)
         try:
             if abs(my_mouse.position[0] -
                    old_pos[0]) + abs(my_mouse.position[1] - old_pos[1]) >= 10:
@@ -32,9 +72,9 @@ def check_mouse_move(t):
                 old_pos = my_mouse.position
                 text1[0] = ' Running.....'
             elif time.time() - start_time <= (t - 2) * 60:
-                my_keyboard.press(keyboard.Key.print_screen)
-                time.sleep(0.01)
-                my_keyboard.release(keyboard.Key.print_screen)
+                if time.time() - press_time > press_fre:
+                    press_key(my_keyboard)
+                    press_time = time.time()
                 text1[0] = ' Running.....'
             else:
                 text1[0] = ' Lock soon...'
@@ -43,8 +83,34 @@ def check_mouse_move(t):
             continue
 
 
+def quit_menu(event):
+    """ Quit menu,triggered by clicking on text window with right mouse button  """
+    global flag
+    flag = not (messagebox.askokcancel("退出", "确定退出吗？"))
+    # but1 = Button(top, text="Quit", width=10, height=2, command=top.quit)
+    # but1.pack()
+
+
+def show():
+    """ Update status witn text on screen,and monitoring exit behavior"""
+    global t1, top, flag
+    while flag:
+        try:
+            time.sleep(display_fre)
+            lab.config(text=text1[0])
+            lab.update()
+        except Exception as e:
+            break
+    stop_thread(t1)
+    top.destroy()
+
+
+flag = True
 text1 = [' Running.....']
-set_time = 15  # Set time of lockscreen
+set_time = 15  # Set screen lock time/min
+display_fre = 0.3  # Show refresh interval/s
+check_fre = 1  # Set check time frequency/s
+press_fre = 30  # Set press time frequency/s
 path = os.path.dirname(os.path.abspath(__file__))
 
 top = Tk()
@@ -57,21 +123,14 @@ lab = Label(top,
             fg='white',
             bg='black')
 lab.master.overrideredirect(True)
-lab.master.geometry("+1785+1010")
+lab.master.geometry("+1780+1015")
 lab.pack()
 
-
-def show():
-    while True:
-        time.sleep(0.3)
-        lab.config(text=text1[0])
-        lab.update()
-
-
 top.after(1000, show)
+top.bind('<Button-3>', quit_menu)
 try:
-    t = threading.Thread(target=check_mouse_move, args=(set_time, ))
-    t.start()
+    t1 = threading.Thread(target=check_mouse_move, args=(set_time, ))
+    t1.start()
     mainloop()
 except:
     pass
