@@ -1,1 +1,1 @@
-python E:\stop_lockScreen\stop_lock_screen.py
+start pythonw E:\stop_lock_screen\stop_lock_screen.py
