@@ -11,6 +11,7 @@
              
              + 实现右键弹出退出菜单，可正常结束脚本
              + 更改按键为scroll_lock，避免剪贴板覆盖截屏
+             + 监测Scroll Lock是否已经激活，避免激活该按键
 '''
 
 import ctypes
@@ -20,6 +21,8 @@ import threading
 import time
 from tkinter import *
 from tkinter import messagebox
+from win32api import GetKeyState
+from win32con import VK_SCROLL
 
 from pynput import keyboard, mouse
 
@@ -45,13 +48,11 @@ def stop_thread(thread):
 
 def press_key(my_keyboard):
     """ Function of pressing key """
-    my_keyboard.press(keyboard.Key.scroll_lock)
-    time.sleep(0.1)
-    my_keyboard.release(keyboard.Key.scroll_lock)
-    
-    my_keyboard.press(keyboard.Key.scroll_lock)
-    time.sleep(0.1)
-    my_keyboard.release(keyboard.Key.scroll_lock)
+    s = 1 if GetKeyState(VK_SCROLL) else 2 # if scroll_lock has been activitied,just press one time,else twice.
+    for i in range(s):
+        my_keyboard.press(keyboard.Key.scroll_lock)
+        time.sleep(0.1)
+        my_keyboard.release(keyboard.Key.scroll_lock)
 
 
 def check_mouse_move(t):
@@ -107,7 +108,7 @@ def show():
 
 flag = True
 text1 = [' Running.....']
-set_time = 15  # Set screen lock time/min
+set_time = 20  # Set screen lock time/min
 display_fre = 0.3  # Show refresh interval/s
 check_fre = 1  # Set check time frequency/s
 press_fre = 30  # Set press time frequency/s
